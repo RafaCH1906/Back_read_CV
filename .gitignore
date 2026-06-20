@@ -1,0 +1,24 @@
+# Byte-compiled / Python cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# C extensions / Compiled binaries
+*.so
+
+# Compilaciones y Empaquetado local (para no subir los ZIPs pesados a GitHub)
+build/
+dist/
+
+# Entornos virtuales
+venv/
+.venv/
+env/
+.env
+
+# Configuraciones de AWS y herramientas locales
+.aws/
+.sam-ops/
+.aws-sam/
+*.log
