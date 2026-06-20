@@ -37,9 +37,12 @@ Compara el siguiente CV contra el puesto descrito. No asumas datos que no
 estén explícitamente en el texto. Si el CV tiene información muy limitada
 o mal extraída, indícalo en confidence_flag como "low_extraction_quality".
 
-No le asignes peso numérico a soft skills en el score (solo son evidencia
-cualitativa); el score debe basarse en experiencia relevante, skills
-técnicas y seniority.
+Para calcular el "score" (0-100), utiliza esta rúbrica de evaluación estricta:
+1. Coincidencia de Skills Técnicas (hasta 40 puntos): Evalúa la presencia de las skills requeridas.
+2. Experiencia y Años Requeridos (hasta 40 puntos): Compara la trayectoria del candidato con los años exigidos. Penaliza fuertemente si no cumple los años mínimos.
+3. Seniority y Consistencia del Perfil (hasta 20 puntos): Evalúa si el perfil general encaja con el rol.
+La suma de estos tres criterios es el score. Evita redondear el score a decenas (como 80 u 85); calcula puntajes específicos y detallados (como 77, 83, 42) para que el ranking sea claro y discrimine con precisión entre candidatos.
+No le asignes peso numérico a soft skills en el score (solo son evidencia cualitativa).
 
 PUESTO: {job_meta.get('job_title', '')}
 SKILLS REQUERIDAS: {job_meta.get('required_skills', [])}
