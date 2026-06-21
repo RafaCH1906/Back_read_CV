@@ -148,6 +148,8 @@ Resources:
         S3Bucket: !Ref DeploymentBucket
         S3Key: get_results.zip
 
+
+
   WorkerFunction:
     Type: AWS::Lambda::Function
     Properties:
