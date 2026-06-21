@@ -2,6 +2,7 @@ import json
 import logging
 import urllib.request
 import urllib.error
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +30,8 @@ def evaluate_cv(api_key: str, prompt: str) -> dict:
     """
     Llama a Groq y devuelve el contenido del mensaje (string).
     El parseo/validación del JSON de evaluación se hace fuera de esta función.
+    Implementa reintentos locales cortos para límites de velocidad (Rate Limits)
+    y errores transitorios antes de fallar la ejecución.
     """
     payload = {
         "model": GROQ_MODEL,
@@ -48,23 +51,46 @@ def evaluate_cv(api_key: str, prompt: str) -> dict:
         method="POST",
     )
 
-    try:
-        with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
-            body = json.loads(response.read().decode("utf-8"))
-            return body["choices"][0]["message"]["content"]
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            with urllib.request.urlopen(request, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+                body = json.loads(response.read().decode("utf-8"))
+                return body["choices"][0]["message"]["content"]
 
-    except urllib.error.HTTPError as e:
-        error_body = e.read().decode("utf-8", errors="ignore")
-        logger.warning("Groq HTTPError %s: %s", e.code, error_body)
+        except urllib.error.HTTPError as e:
+            error_body = e.read().decode("utf-8", errors="ignore")
+            logger.warning("Groq HTTPError %s: %s (intento %s/%s)", e.code, error_body, attempt + 1, max_retries)
 
-        if e.code == 429:
-            raise GroqRateLimitError(f"Rate limit alcanzado: {error_body}") from e
-        if 500 <= e.code < 600:
-            raise GroqTransientError(f"Error de servidor Groq {e.code}: {error_body}") from e
-        # 400, 401, 403, etc. -> no tiene sentido reintentar
-        raise GroqInvalidRequestError(f"Request inválido ({e.code}): {error_body}") from e
+            if e.code == 429:
+                if attempt < max_retries - 1:
+                    sleep_time = 4.0
+                    # Intentar extraer el tiempo sugerido por Groq (ej: "Please try again in 2.97s")
+                    try:
+                        if "try again in" in error_body:
+                            parts = error_body.split("try again in")
+                            sec_str = parts[1].strip().split("s")[0]
+                            sleep_time = float(sec_str) + 0.5
+                    except Exception:
+                        pass
+                    logger.info("Esperando %s segundos antes de reintentar por Rate Limit...", sleep_time)
+                    time.sleep(sleep_time)
+                    continue
+                raise GroqRateLimitError(f"Rate limit alcanzado: {error_body}") from e
 
-    except urllib.error.URLError as e:
-        # timeout, DNS, conexión rechazada, etc. -> transitorio, reintentar
-        logger.warning("Groq URLError: %s", e)
-        raise GroqTransientError(f"Error de red llamando a Groq: {e}") from e
+            if 500 <= e.code < 600:
+                if attempt < max_retries - 1:
+                    logger.info("Esperando 2 segundos antes de reintentar por error transitorio de servidor...")
+                    time.sleep(2.0)
+                    continue
+                raise GroqTransientError(f"Error de servidor Groq {e.code}: {error_body}") from e
+            # 400, 401, 403, etc. -> no tiene sentido reintentar
+            raise GroqInvalidRequestError(f"Request inválido ({e.code}): {error_body}") from e
+
+        except urllib.error.URLError as e:
+            # timeout, DNS, conexión rechazada, etc. -> transitorio, reintentar
+            logger.warning("Groq URLError: %s (intento %s/%s)", e, attempt + 1, max_retries)
+            if attempt < max_retries - 1:
+                time.sleep(2.0)
+                continue
+            raise GroqTransientError(f"Error de red llamando a Groq: {e}") from e
