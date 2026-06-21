@@ -91,7 +91,7 @@ Resources:
     Type: AWS::SQS::Queue
     Properties:
       QueueName: cv-ranker-queue
-      VisibilityTimeout: 360          # >= 6x el timeout del worker
+      VisibilityTimeout: 90           # Mayor al timeout del worker para reintentar rapido (90s)
       RedrivePolicy:
         deadLetterTargetArn: !GetAtt CvDLQ.Arn
         maxReceiveCount: 3            # tras 3 fallos -> DLQ
@@ -156,7 +156,7 @@ Resources:
       FunctionName: cv-worker
       Runtime: python3.12
       Handler: functions.worker.handler.handler
-      Timeout: 120
+      Timeout: 60
       ReservedConcurrentExecutions: 2
       Role: !Sub 'arn:aws:iam::${AWS::AccountId}:role/LabRole'
       Environment:
